@@ -4,7 +4,6 @@ A desktop application for sorting and clustering large collections of photos bas
 
 The application provides a graphical user interface (GUI) built with PyQt6 to visualize clusters, inspect individual images, and save the sorted results.
 
-![Sorter App Screenshot](https://i.imgur.com/example.png)  <!-- You can replace this with a real screenshot URL later -->
 
 ## Features
 
@@ -23,37 +22,48 @@ The application provides a graphical user interface (GUI) built with PyQt6 to vi
 
 ## Setup and Installation
 
+This guide will walk you through setting up the project and installing all necessary dependencies.
+
 ### Prerequisites
 
 - Python 3.8+
-- PyTorch (with CUDA support for GPU acceleration, if available)
+- An environment manager like `venv` (recommended) or `conda`.
 
 ### Installation Steps
 
-1.  **Clone the repository:**
+1.  **Clone the Repository**
+
+    First, clone this repository to your local machine.
     ```bash
     git clone [https://github.com/your-username/face-sorter.git](https://github.com/your-username/face-sorter.git)
     cd face-sorter
     ```
 
-2.  **Create a virtual environment (recommended):**
+2.  **Create a Virtual Environment**
+
+    It is highly recommended to create a virtual environment to keep the project's dependencies isolated.
     ```bash
+    # For venv
     python -m venv venv
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
     ```
 
-3.  **Install PyTorch:**
-    Visit the [official PyTorch website](https://pytorch.org/get-started/locally/) to get the correct installation command for your system (based on your OS and CUDA version). For example:
+3.  **Install PyTorch**
+
+    This project depends on PyTorch. For the best performance (especially with a GPU), you should install it manually before the other requirements. Visit the [official PyTorch website](https://pytorch.org/get-started/locally/) to find the correct installation command for your specific OS and CUDA version.
+
+    *Example for Linux/Windows with CUDA 11.8:*
     ```bash
-    # Example for Linux/Windows with CUDA 11.8
     pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu118](https://download.pytorch.org/whl/cu118)
     ```
-    Or for a CPU-only version:
+    *Example for a CPU-only installation:*
     ```bash
     pip install torch torchvision torchaudio
     ```
 
-4.  **Install the remaining dependencies:**
+4.  **Install All Other Dependencies**
+
+    Once PyTorch is installed, you can install the rest of the required packages from the `requirements.txt` file with a single command.
     ```bash
     pip install -r requirements.txt
     ```
@@ -68,7 +78,7 @@ The application provides a graphical user interface (GUI) built with PyQt6 to vi
 2.  **Select an Image Folder**: Click the "Select Image Folder" button to choose the directory containing your images.
 
 3.  **Choose a Processing Mode**:
-    - If your images are already cropped faces (like the samples you provided), use the **"Process Pre-aligned Face Crops"** mode for the best performance.
+    - If your images are already cropped faces, use the **"Process Pre-aligned Face Crops"** mode for the best performance.
     - If your images are regular photos, use the **"Detect Faces in Full Images"** mode.
 
 4.  **Start Clustering**: Click the "Start Clustering" button. The progress bar will show the status of the embedding generation.
@@ -85,30 +95,3 @@ The application provides a graphical user interface (GUI) built with PyQt6 to vi
 7.  **Save/Load Project (Optional)**:
     - Use the **"Save Project"** button to save the state of your checked clusters and approved images.
     - To resume your work later, run the clustering on the same folder first, then click **"Load Project"** to restore your previous selections.
-
-
-SETUP
-This file lists the required packages for the Face Identity Sorter.
-You can install them all at once using the command:
-pip install -r requirements.txt
-Core libraries for data handling and machine learning
-numpy==1.26.4
-scikit-learn==1.4.2
-Pillow==10.3.0
-tqdm==4.66.4
-
-GUI Framework
-PyQt6==6.7.0
-
-Face detection and recognition
-facenet-pytorch==2.5.3
-
---- PyTorch Installation ---
-NOTE: It is highly recommended to install PyTorch and Torchvision manually BEFORE
-installing the packages from this file. This ensures you get the correct
-version for your hardware (i.e., with or without GPU/CUDA support).
-Visit https://pytorch.org/get-started/locally/ to find the command for your system.
-If you have already installed PyTorch, you can leave these lines commented out.
-If you want pip to install a default (CPU) version, you can uncomment them.
-torch==2.3.0
-torchvision==0.18.0
