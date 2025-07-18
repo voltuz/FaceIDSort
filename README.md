@@ -85,3 +85,30 @@ The application provides a graphical user interface (GUI) built with PyQt6 to vi
 7.  **Save/Load Project (Optional)**:
     - Use the **"Save Project"** button to save the state of your checked clusters and approved images.
     - To resume your work later, run the clustering on the same folder first, then click **"Load Project"** to restore your previous selections.
+
+
+SETUP
+This file lists the required packages for the Face Identity Sorter.
+You can install them all at once using the command:
+pip install -r requirements.txt
+Core libraries for data handling and machine learning
+numpy==1.26.4
+scikit-learn==1.4.2
+Pillow==10.3.0
+tqdm==4.66.4
+
+GUI Framework
+PyQt6==6.7.0
+
+Face detection and recognition
+facenet-pytorch==2.5.3
+
+--- PyTorch Installation ---
+NOTE: It is highly recommended to install PyTorch and Torchvision manually BEFORE
+installing the packages from this file. This ensures you get the correct
+version for your hardware (i.e., with or without GPU/CUDA support).
+Visit https://pytorch.org/get-started/locally/ to find the command for your system.
+If you have already installed PyTorch, you can leave these lines commented out.
+If you want pip to install a default (CPU) version, you can uncomment them.
+torch==2.3.0
+torchvision==0.18.0
