@@ -1,97 +1,172 @@
-# Face Identity Sorter
+# 🚀 High-Speed Face Identity Sorter
 
-A desktop application for sorting and clustering large collections of photos based on facial identity. This tool uses deep learning to generate facial embeddings and the DBSCAN algorithm to group similar faces together, allowing for efficient management and organization of images.
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)
+![GPU Support](https://img.shields.io/badge/GPU-CUDA%20Recommended-orange.svg)
 
-The application provides a graphical user interface (GUI) built with PyQt6 to visualize clusters, inspect individual images, and save the sorted results.
+A blazing-fast utility to **sort and group images by facial identity** using cutting-edge deep learning and clustering techniques. Built with `facenet-pytorch`, `DBSCAN`, and a sleek `PyQt6` GUI, this tool makes processing **thousands of face images** efficient, visual, and intuitive.
 
+---
 
-## Features
+## 📑 Table of Contents
+- [✨ Features](#-features)
+- [⚙️ Installation](#️-installation)
+  - [Using Conda (Recommended)](#using-conda-recommended)
+  - [Using Virtualenv + Pip](#using-virtualenv--pip)
+- [🚦 Workflow & Usage](#-workflow--usage)
+- [⚠️ Limitations & Considerations](#️-limitations--considerations)
 
-- **High-Performance Face Clustering**: Utilizes the pre-trained FaceNet model (InceptionResnetV1) for accurate facial embedding generation.
-- **Efficient Clustering Algorithm**: Employs DBSCAN to group faces without needing to specify the number of clusters beforehand.
-- **Two Processing Modes**:
-    1.  **Pre-aligned Mode (Fast)**: Directly processes images that are already cropped to faces.
-    2.  **Detection Mode (Slower)**: Uses an integrated MTCNN to automatically detect and crop faces from full images.
-- **Interactive GUI**:
-    - Visualize all discovered clusters.
-    - Inspect and curate clusters with a lazy-loading image viewer for handling thousands of images smoothly.
-    - Select/deselect entire clusters for batch processing.
-- **Configurable Parameters**: Adjust DBSCAN's `epsilon` and `min_samples` parameters directly from the UI to fine-tune clustering sensitivity.
-- **Project Management**: Save and load your curation progress (which images are approved/selected in each cluster) to a project file.
-- **Responsive Layout**: The cluster display automatically adjusts its layout based on the window size to avoid horizontal scrolling.
+---
 
-## Setup and Installation
+## ✨ Features
 
-This guide will walk you through setting up the project and installing all necessary dependencies.
+- ⚡ **High-Speed Processing**  
+  Utilizes a CUDA-enabled GPU and PyTorch DataLoader for face embedding generation at **500+ images/sec**.
 
-### Prerequisites
+- 🧠 **Two Processing Modes**
+  - **Pre-Aligned Mode** *(fastest)* – for tightly cropped face images.
+  - **Face Detection Mode** *(slower)* – uses MTCNN for full-scene images.
 
-- Python 3.8+
-- An environment manager like `venv` (recommended) or `conda`.
+- 🖼️ **Interactive GUI**  
+  Built with `PyQt6`, making it easy to:
+  - Select data folders
+  - View, inspect, and refine clusters
+  - Save final results
 
-### Installation Steps
+- 🔍 **Cluster Editing**  
+  Inspect each cluster in detail and manually remove misclassified images before exporting.
 
-1.  **Clone the Repository**
+- 🧠 **Smart Caching**  
+  Embeddings are cached (`face_embeddings_facenet.pkl`) so re-clustering is nearly instant.
 
-    First, clone this repository to your local machine.
-    ```bash
-    git clone [https://github.com/your-username/face-sorter.git](https://github.com/your-username/face-sorter.git)
-    cd face-sorter
-    ```
+- 🗃️ **Project Management**  
+  Save your session to JSON and pick up right where you left off.
 
-2.  **Create a Virtual Environment**
+---
 
-    It is highly recommended to create a virtual environment to keep the project's dependencies isolated.
-    ```bash
-    # For venv
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    ```
+## ⚙️ Installation
 
-3.  **Install PyTorch**
+### ✅ Requirements
+- **Python 3.10+**
+- **CUDA-enabled NVIDIA GPU** *(strongly recommended)*
+- Dependencies: See `environment.yml` and `requirements.txt`
 
-    This project depends on PyTorch. For the best performance (especially with a GPU), you should install it manually before the other requirements. Visit the [official PyTorch website](https://pytorch.org/get-started/locally/) to find the correct installation command for your specific OS and CUDA version.
+### 📦 Using Conda (Recommended)
 
-    *Example for Linux/Windows with CUDA 11.8:*
-    ```bash
-    pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu118](https://download.pytorch.org/whl/cu118)
-    ```
-    *Example for a CPU-only installation:*
-    ```bash
-    pip install torch torchvision torchaudio
-    ```
+1. **Install Anaconda or Miniconda**  
+   [https://www.anaconda.com/products/distribution](https://www.anaconda.com/products/distribution)
 
-4.  **Install All Other Dependencies**
+2. **Create the Conda Environment**
 
-    Once PyTorch is installed, you can install the rest of the required packages from the `requirements.txt` file with a single command.
-    ```bash
-    pip install -r requirements.txt
-    ```
+   ```bash
+   conda env create -f environment.yml
+   ```
 
-## How to Use
+3. **Activate the Environment**
 
-1.  **Run the application:**
-    ```bash
-    python sorter_app.py
-    ```
+   ```bash
+   conda activate face_sorter_env
+   ```
 
-2.  **Select an Image Folder**: Click the "Select Image Folder" button to choose the directory containing your images.
+4. **Install Dependencies**
 
-3.  **Choose a Processing Mode**:
-    - If your images are already cropped faces, use the **"Process Pre-aligned Face Crops"** mode for the best performance.
-    - If your images are regular photos, use the **"Detect Faces in Full Images"** mode.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-4.  **Start Clustering**: Click the "Start Clustering" button. The progress bar will show the status of the embedding generation.
+   > 🧠 PyTorch should detect your CUDA version. If it doesn't, visit [https://pytorch.org](https://pytorch.org) for the correct command.
 
-5.  **Review and Curate**:
-    - Once clustering is complete, the main window will populate with the discovered clusters.
-    - Click **"View / Edit Selection"** on any cluster to open the inspector.
-    - In the inspector, click on images to deselect them if they don't belong. Confirm your selection to save the changes.
+---
 
-6.  **Save Results**:
-    - Select the clusters you wish to save by checking the box on their group title.
-    - Click **"Save Selected Clusters"** and choose a destination folder. The approved images from the selected clusters will be copied into subfolders (e.g., `cluster_0`, `cluster_1`, etc.).
+### 🧪 Using Virtualenv + Pip
 
-7.  **Save/Load Project (Optional)**:
-    - Use the **"Save Project"** button to save the state of your checked clusters and approved images.
-    - To resume your work later, run the clustering on the same folder first, then click **"Load Project"** to restore your previous selections.
+1. **Create Virtual Environment**
+
+   ```bash
+   python -m venv venv
+   ```
+
+2. **Activate the Environment**
+
+   - **Windows**
+     ```bash
+     .\venv\Scripts\activate
+     ```
+
+   - **macOS/Linux**
+     ```bash
+     source venv/bin/activate
+     ```
+
+3. **Install Dependencies**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+---
+
+## 🚦 Workflow & Usage
+
+1. **Launch the App**
+
+   ```bash
+   python sorter_app.py
+   ```
+
+2. **Select Image Folder**  
+   Use the GUI to choose the folder containing your images.
+
+3. **Choose Processing Mode**
+   - 🖼️ *Pre-Aligned*: For already-cropped face images.
+   - 🧑‍🤝‍🧑 *Detect Faces*: For general photos with faces in various positions.
+
+4. **Start Clustering**
+   - Generates embeddings using FaceNet
+   - Groups similar faces using DBSCAN
+   - Shows clusters in the main GUI
+
+5. **Review & Edit Clusters**
+   - Use checkboxes to select clusters
+   - Use "View / Edit" to inspect images in each cluster
+   - Deselect misclassified images manually
+
+6. **Save Results**
+   - Choose your preferred output format: `separate folders` or `single folder`
+   - Click **Save Selected Clusters** to export
+
+---
+
+## ⚠️ Limitations & Considerations
+
+- **🤖 Model Bias**  
+  As with all AI, model accuracy may vary across demographics.
+
+- **🖼️ Image Quality Matters**  
+  Blurry or low-res faces will reduce cluster accuracy.
+
+- **🧍 Face Orientation**  
+  Best results with frontal or near-frontal faces.
+
+- **🛠️ DBSCAN Tuning**  
+  Fine-tune `epsilon` and `min_samples` in "Advanced Settings" for better clustering.  
+  - Smaller `epsilon` → tighter, more precise groups  
+  - Larger `epsilon` → more lenient grouping
+
+- **📦 "Unclassified" Group (-1)**  
+  Outliers that couldn’t be grouped—often poor-quality or unique faces.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+
+---
+
+## 💬 Contributions & Feedback
+
+Feel free to fork, open issues, or submit PRs. Feedback is always welcome!
+
+---
