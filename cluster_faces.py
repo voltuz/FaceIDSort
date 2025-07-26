@@ -7,39 +7,80 @@ from sklearn.cluster import DBSCAN
 from PIL import Image
 
 import torch
+from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from facenet_pytorch import InceptionResnetV1, MTCNN
 
 # --- Configuration ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EMBEDDINGS_CACHE = os.path.join(SCRIPT_DIR, "face_embeddings_facenet.pkl")
-BATCH_SIZE = 64
+# You can experiment with batch size. Larger sizes might be faster if you have enough VRAM.
+BATCH_SIZE = 64 
 
 # --- Image transformation for pre-aligned images ---
-# The InceptionResnetV1 model expects 160x160 standardized images.
-# FIX: Replaced the custom standardization with the correct, standard PyTorch transform.
-# This maps image tensors from a [0, 1] range to a [-1, 1] range.
+# This remains the same. It's the standard transform for the model.
 aligned_transform = transforms.Compose([
     transforms.Resize((160, 160)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
+# --- NEW: Custom Dataset for efficient loading ---
+# This class will read image paths and load them.
+class FaceImageDataset(Dataset):
+    def __init__(self, image_paths, transform=None):
+        self.image_paths = image_paths
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        path = self.image_paths[idx]
+        try:
+            # Open image and convert to RGB
+            img = Image.open(path).convert('RGB')
+            # Apply transforms if they are provided (for pre-aligned mode)
+            if self.transform:
+                img = self.transform(img)
+            return img, path
+        except Exception as e:
+            # If an image is corrupt or can't be opened, return None
+            print(f"Warning: Could not load image {path}. Skipping. Error: {e}")
+            return None, path
+
+# --- NEW: Custom Collate Function for DataLoader ---
+# This function gathers the data from the Dataset and prepares it for the model.
+# It also safely skips any corrupt images that failed to load in __getitem__.
+def collate_fn(batch):
+    # Filter out None values returned by the Dataset for corrupt images
+    batch = [item for item in batch if item[0] is not None]
+    if not batch:
+        return None, None
+    
+    images, paths = zip(*batch)
+    
+    # If images are tensors (from pre-aligned mode), stack them.
+    # If they are PIL Images (for MTCNN mode), they remain as a list.
+    if isinstance(images[0], torch.Tensor):
+        images = torch.stack(images, 0)
+        
+    return images, paths
+
+# --- UPDATED: Main function using the new DataLoader ---
 def generate_and_cache_embeddings(image_paths, progress_callback=None, use_mtcnn=True):
     """
-    Generates facial embeddings, now with correct standardization and a "smarter" cache
-    that is aware of the processing mode.
+    Generates facial embeddings using an efficient DataLoader to parallelize
+    image loading and preprocessing.
     """
     current_mode = 'mtcnn' if use_mtcnn else 'prealigned'
     
-    # FIX: Caching logic now checks if the cache mode matches the current run mode.
+    # Cache loading logic remains unchanged
     if os.path.exists(EMBEDDINGS_CACHE):
         print(f"Loading embeddings from cache: {EMBEDDINGS_CACHE}")
         try:
             with open(EMBEDDINGS_CACHE, 'rb') as f:
                 cached_data = pickle.load(f)
-                
-                # New, robust cache format check
                 if isinstance(cached_data, dict) and 'mode' in cached_data:
                     if cached_data['mode'] == current_mode:
                         print(f"Cache is valid for '{current_mode}' mode.")
@@ -47,9 +88,7 @@ def generate_and_cache_embeddings(image_paths, progress_callback=None, use_mtcnn
                     else:
                         print(f"Cache mode ('{cached_data['mode']}') does not match current mode ('{current_mode}'). Regenerating.")
                 else:
-                    # Handle old cache format or invalid dict
-                    print("Old or invalid cache format detected. Regenerating embeddings for safety.")
-
+                    print("Old or invalid cache format detected. Regenerating embeddings.")
         except Exception as e:
             print(f"Could not load or parse cache file. Regenerating embeddings. Error: {e}")
 
@@ -64,63 +103,96 @@ def generate_and_cache_embeddings(image_paths, progress_callback=None, use_mtcnn
     mtcnn = None
     if use_mtcnn:
         print("Building MTCNN face detection model...")
+        # Note: We are setting keep_all=True here to align detections with paths,
+        # but will only process the first valid face found per image.
         mtcnn = MTCNN(
             image_size=160, margin=0, min_face_size=20,
             thresholds=[0.6, 0.7, 0.7], factor=0.709, post_process=True,
-            device=device, keep_all=False
+            device=device, keep_all=True 
         )
         print("MTCNN model built.")
     
-    total_images = len(image_paths)
-    print(f"Generating embeddings for {total_images} images...")
+    # --- MAJOR CHANGE: Use DataLoader for Efficiency ---
+    # Don't apply a transform if using MTCNN, as it works on PIL Images.
+    transform_to_use = aligned_transform if not use_mtcnn else None
+    dataset = FaceImageDataset(image_paths, transform=transform_to_use)
+    
+    # Set num_workers > 0 to enable parallel loading.
+    # A good starting point is 4, but you can tune this for your machine.
+    # Set pin_memory=True to potentially speed up data transfer to the GPU.
+    data_loader = DataLoader(dataset, 
+                             batch_size=BATCH_SIZE, 
+                             shuffle=False, 
+                             num_workers=4,
+                             collate_fn=collate_fn,
+                             pin_memory=True)
 
-    for i in tqdm(range(0, total_images, BATCH_SIZE), desc="Generating Embeddings"):
-        batch_paths = image_paths[i : i + BATCH_SIZE]
-        
-        image_batch_pil = []
-        valid_paths_in_batch = []
-        for path in batch_paths:
-            try:
-                img = Image.open(path).convert('RGB')
-                image_batch_pil.append(img)
-                valid_paths_in_batch.append(path)
-            except Exception:
-                rejected_files['corrupt'].append(path)
-                continue
-        
-        if not image_batch_pil:
-            if progress_callback:
-                progress_callback(i + len(batch_paths), total_images)
+    total_images = len(image_paths)
+    processed_count = 0
+    print(f"Generating embeddings for up to {total_images} images using DataLoader...")
+
+    # --- The New, Efficient Processing Loop ---
+    for batch_images, batch_paths in tqdm(data_loader, desc="Generating Embeddings"):
+        # If the whole batch was corrupt, collate_fn returns None
+        if batch_images is None:
+            # Record corrupt paths if any (though collate_fn handles this)
+            if batch_paths: rejected_files['corrupt'].extend(batch_paths)
+            processed_count += len(batch_paths) if batch_paths else BATCH_SIZE
             continue
 
         try:
             faces_tensor = None
+            valid_paths = []
+
             if use_mtcnn:
-                faces_batch_detected = mtcnn(image_batch_pil)
-                valid_faces = [face for face in faces_batch_detected if face is not None]
+                # MTCNN processes a batch of PIL images
+                with torch.no_grad():
+                    # The output is a list of tensors (or None if no face is found)
+                    faces_batch_detected = mtcnn(batch_images)
+                
+                # Filter out images where no face was detected and align paths
+                valid_faces = []
+                for i, face_tensor in enumerate(faces_batch_detected):
+                    # We only process the first face found in an image
+                    if face_tensor is not None:
+                        # Since keep_all=True, it might be a list of faces. Take the first.
+                        if isinstance(face_tensor, list) and len(face_tensor) > 0:
+                            valid_faces.append(face_tensor[0])
+                            valid_paths.append(batch_paths[i])
+                        # Or it's a single tensor
+                        elif torch.is_tensor(face_tensor):
+                             valid_faces.append(face_tensor)
+                             valid_paths.append(batch_paths[i])
+                        else:
+                            rejected_files['processing_error'].append(batch_paths[i])
+                    else:
+                        rejected_files['processing_error'].append(batch_paths[i])
+                
                 if valid_faces:
                     faces_tensor = torch.stack(valid_faces).to(device)
-            else:
-                transformed_batch = [aligned_transform(img) for img in image_batch_pil]
-                faces_tensor = torch.stack(transformed_batch).to(device)
 
+            else: # Pre-aligned mode
+                faces_tensor = batch_images.to(device)
+                valid_paths = list(batch_paths)
+
+            # Generate embeddings for the valid faces in the batch
             if faces_tensor is not None and len(faces_tensor) > 0:
                 with torch.no_grad():
                     embeddings = resnet(faces_tensor).detach().cpu().numpy()
-                for j, path in enumerate(valid_paths_in_batch):
-                    all_embeddings[path] = embeddings[j]
-            else:
-                rejected_files['processing_error'].extend(valid_paths_in_batch)
+                for i, path in enumerate(valid_paths):
+                    all_embeddings[path] = embeddings[i]
 
         except Exception as e:
             print(f"\nAn error occurred processing a batch: {e}")
-            rejected_files['processing_error'].extend(valid_paths_in_batch)
+            rejected_files['processing_error'].extend(batch_paths)
         
+        # Update progress
+        processed_count += len(batch_paths)
         if progress_callback:
-            progress_callback(i + len(batch_paths), total_images)
+            progress_callback(processed_count, total_images)
 
+    # Caching logic remains the same
     print(f"Saving {len(all_embeddings)} embeddings to cache: {EMBEDDINGS_CACHE}")
-    # FIX: Save data in the new, more robust dictionary format
     data_to_cache = {
         'mode': current_mode,
         'embeddings': all_embeddings,
@@ -133,12 +205,18 @@ def generate_and_cache_embeddings(image_paths, progress_callback=None, use_mtcnn
 
 
 def get_image_paths(folder):
-    """Gets all common image file paths from a directory."""
-    extensions = ('*.jpg', '*.jpeg', '*.png')
+    """Gets all common image file paths from a directory and removes duplicates."""
+    extensions = ('*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG')
     paths = []
+    # The recursive search is kept as it's useful for subdirectories
     for ext in extensions:
-        paths.extend(glob.glob(os.path.join(folder, ext)))
-    return paths
+        paths.extend(glob.glob(os.path.join(folder, "**", ext), recursive=True))
+    
+    # --- FIX: Remove duplicate paths found on case-insensitive systems ---
+    unique_paths = list(set(paths))
+    
+    print(f"Found {len(unique_paths)} unique images in {folder}")
+    return unique_paths
 
 def cluster_embeddings(embeddings_dict, epsilon, min_samples):
     """Clusters embeddings using DBSCAN with configurable parameters."""
@@ -147,6 +225,7 @@ def cluster_embeddings(embeddings_dict, epsilon, min_samples):
     embeddings = np.array(list(embeddings_dict.values()))
     
     print(f"Clustering {len(paths)} faces with DBSCAN (eps={epsilon}, min_samples={min_samples})...")
+    # Use n_jobs=-1 to use all available CPU cores for clustering
     clt = DBSCAN(metric="cosine", eps=epsilon, min_samples=min_samples, n_jobs=-1)
     clt.fit(embeddings)
     
